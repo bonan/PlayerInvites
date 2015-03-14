@@ -1,0 +1,35 @@
+name: PlayerInvites
+main: se.bonan.playerinvites.PlayerInvites
+version: 0.1
+author: bonaan
+commands:
+  invite:
+    description: Handles invitations
+    usage: /invite
+    permission: invites.use
+
+permissions:
+  invites.use:
+    description: Can use /invite
+    default: true
+  invites.invite:
+    description: Allows a player to use invites
+    default: true
+  invites.show:
+    description: Allows a player to see its invite count and invited players
+    default: true
+  invites.showother:
+    description: Allows a player to see other players invite count and invited players
+    default: op
+  invites.buy:
+    description: Allows a player to buy invites
+    default: true
+  invites.give:
+    description: Allows a player to give away invites
+    default: op
+  invites.showgiven:
+    description: Displays a message to a user when they're given invites
+    default: true
+  invites.reload:
+    description: Reload invites configuration and data files
+    default: op
