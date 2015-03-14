@@ -18,16 +18,31 @@ import java.util.UUID;
 public class Invites {
 
     PlayerInvites plugin;
+
+    /**
+     * Helper object for mapping of JSON to Object
+     */
     DataFile data;
 
     public Invites(PlayerInvites plugin) {
         this.plugin = plugin;
+
+        /**
+         * Create empty data object to avoid NullPointerException if load fails
+         */
         this.data = new DataFile();
+
+        /**
+         * Load data
+         */
         load();
     }
 
     private String load() {
         try {
+            /**
+             * Loads file from data.json in plugin data folder
+             */
             data = DataFile.load(new File(plugin.getDataFolder(), "data.json"));
         } catch (IOException e) {
             plugin.getLogger().warning(
@@ -40,6 +55,9 @@ public class Invites {
 
     private void save() {
         try {
+            /**
+             * Saves data as json to data.json in plugin data folder
+             */
             data.save(new File(plugin.getDataFolder(), "data.json"));
         } catch (IOException e) {
             plugin.getLogger().warning(
@@ -48,6 +66,12 @@ public class Invites {
         }
     }
 
+    /**
+     * Adds or removes invites from a player based on player name
+     * @param target Name of player
+     * @param count Amount of invites to add (negative to subtract)
+     * @return false if player not found
+     */
     private Boolean updateInvites(String target, Integer count) {
         OfflinePlayer player = getPlayer(target);
         if (player != null) {
@@ -57,6 +81,11 @@ public class Invites {
         return false;
     }
 
+    /**
+     * Adds or removes invites from a player based on player object
+     * @param player Player object
+     * @param count Amount of invites to add (negative to subtract)
+     */
     private void updateInvites(OfflinePlayer player, Integer count) {
         String target = player.getUniqueId().toString();
         Map<String,Integer> invites = data.getInvites();
@@ -70,6 +99,11 @@ public class Invites {
         invites.put(target, newCount);
     }
 
+    /**
+     * Adds a player to white list based on player name
+     * @param target Player name
+     * @return Whitelisted player UUID on success, "exists" if player already is in whitelist, "failed" on error
+     */
     private String addWhitelist(String target) {
         for (OfflinePlayer player: plugin.getServer().getWhitelistedPlayers()) {
             if (player.getName().equalsIgnoreCase(target)) {
@@ -93,6 +127,11 @@ public class Invites {
 
     }
 
+    /**
+     * Removes player from whitelist based on name
+     * @param target Player name
+     * @return true on success
+     */
     private Boolean removeWhitelist(String target) {
         return plugin.getServer().dispatchCommand(
                 plugin.getServer().getConsoleSender(),
@@ -100,10 +139,19 @@ public class Invites {
         );
     }
 
+    /**
+     * Reloads configuration
+     * @return empty string on success, error message otherwise
+     */
     public String reload() {
         return load();
     }
 
+    /**
+     * Get player name from player uuid
+     * @param uuid Player uuid
+     * @return Player name
+     */
     public String getName(String uuid) {
 
         OfflinePlayer player = plugin.getServer().getOfflinePlayer(UUID.fromString(uuid));
@@ -112,16 +160,30 @@ public class Invites {
         return "";
     }
 
+    /**
+     * Get player based on player uuid
+     * @param uuid UUID of player
+     * @return Player
+     */
     public OfflinePlayer getPlayer(UUID uuid) {
         return plugin.getServer().getOfflinePlayer(uuid);
     }
 
+    /**
+     * Gets player object from player name.
+     * @param name Name of player
+     * @return Player object, null if no player found
+     */
     public OfflinePlayer getPlayer(String name) {
         for (OfflinePlayer player: plugin.getServer().getOfflinePlayers()) {
             if (player.getName().equalsIgnoreCase(name)) {
                 return player;
             }
         }
+        /**
+         * If player not found, check white list for players that are whitelisted
+         * but hasn't joined the server yet
+         */
         for (OfflinePlayer player: plugin.getServer().getWhitelistedPlayers()) {
             if (player.getName().equalsIgnoreCase(name)) {
                 return player;
@@ -130,6 +192,11 @@ public class Invites {
         return null;
     }
 
+    /**
+     * Get number of invites based on player name
+     * @param target Player name
+     * @return Number of invites, null if player not found
+     */
     public Integer getInvites(String target) {
         OfflinePlayer player = getPlayer(target);
         if (player != null)
@@ -137,6 +204,11 @@ public class Invites {
         return null;
     }
 
+    /**
+     * Get number of invites based on player object
+     * @param target Player object
+     * @return Number of invites
+     */
     public Integer getInvites(OfflinePlayer target) {
         Integer count = 0;
         Map<String,Integer> invites = data.getInvites();
@@ -147,10 +219,20 @@ public class Invites {
         return count;
     }
 
+    /**
+     * Checks if inviter has >0 invites available, then adds target player to whitelist
+     *   and subtracts number of invites from inviter by one
+     * @param inviter Player issuing invite
+     * @param target Player to be added to whitelist
+     * @return In-game message to inviter
+     */
     public String invitePlayer(Player inviter, String target) {
         FileConfiguration c = plugin.getConfig();
 
         if (getInvites(inviter) < 1) {
+            /**
+             * Not enough invites
+             */
             return ChatColor.RED + c.getString("stringNoInvites",
                     "You have no invites available");
         }
@@ -159,18 +241,36 @@ public class Invites {
         String uuid = addWhitelist(target);
 
         if (uuid == null || uuid.equals("failed") || uuid.equals("")) {
+            /**
+             * Failed to add player, invalid name or player not found
+             * No action taken
+             */
             return ChatColor.RED + c.getString("stringInviteError",
                     "Unable to invite %s")
                     .replace("%s", ChatColor.BLUE + target + ChatColor.RED);
         }
         if (uuid.equals("exists")) {
+            /**
+             * Target already in whitelist, no action taken
+             */
             return ChatColor.RED + c.getString("stringInviteExists",
                     "%s has already been invited")
                     .replace("%s", ChatColor.BLUE + target + ChatColor.RED);
         }
 
+        /**
+         * Add player uuid:s to invited list
+         */
         invited.put(uuid, inviter.getUniqueId().toString());
+
+        /**
+         * Subtract number of invites
+         */
         updateInvites(inviter, -1);
+
+        /**
+         * Save data file
+         */
         save();
 
         return ChatColor.GREEN + c.getString("stringInviteSuccess",
@@ -178,6 +278,12 @@ public class Invites {
                 .replace("%s", ChatColor.BLUE + target + ChatColor.GREEN);
     }
 
+    /**
+     * Returns information about a players number of invites
+     * @param target Name of player to show info for
+     * @param self True if target is player (Shows "You have" instead of "player has")
+     * @return Message to player
+     */
     public String showInvites(String target, Boolean self) {
         FileConfiguration c = plugin.getConfig();
         Integer invites = getInvites(target);
@@ -208,17 +314,24 @@ public class Invites {
                 .replace("%d", ChatColor.BLUE + invites.toString() + ChatColor.GREEN);
     }
 
+    /**
+     * Returns info about who invited a player and who they have invited based on player name
+     * @param target Player to show info about
+     * @return Message to player
+     */
     public String showInvited(String target) {
         OfflinePlayer player = getPlayer(target);
         if (player != null)
             return showInvited(player);
 
-        return ChatColor.RED + plugin.getConfig().getString(
-                "stringPlayerNotFound",
-                "Player %s was not found")
-                .replace("%s", target);
+        return null;
     }
 
+    /**
+     * Returns info about who invited a player and who they have invited based on player object
+     * @param player Player to show info about
+     * @return Message to player
+     */
     public String showInvited(OfflinePlayer player) {
         String target = player.getUniqueId().toString();
         Map<String, String> dataInvited = data.getInvited();
@@ -266,6 +379,12 @@ public class Invites {
         return inviterMsg + invitedMsg;
     }
 
+    /**
+     * Adds (or subtracts if negative) invites to a player
+     * @param target Name of player to give invites
+     * @param count Amount of invites to give
+     * @return Message to player
+     */
     public String giveInvite(String target, Integer count) {
 
         FileConfiguration c = plugin.getConfig();
@@ -301,6 +420,13 @@ public class Invites {
                 .replace("%d", ChatColor.BLUE + count.toString() + ChatColor.GREEN);
     }
 
+    /**
+     * Buy invites.
+     * Subtracts money and increases number of invites of a player
+     * @param player Player object that buys invites
+     * @param count Amount of invites to buy
+     * @return Message to player
+     */
     public String buyInvite(Player player, Integer count) {
         FileConfiguration c = plugin.getConfig();
         Double price = plugin.getConfig().getDouble("buyInvitePrice");
