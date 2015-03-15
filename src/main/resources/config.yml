@@ -1,54 +1,48 @@
-#
-# Sample configuration file for PlayerInvites
-#
-
-## Allow a player to buy invites:
+##
+## Sample configuration file for PlayerInvites
+##
+## Enable to allow users to buy invites for in-game money
+## Requires the Vault plugin (and any of its supported Economy plugins)
+##
 buyInvite: false
-
-## Set price per invite:
+##
+## Price per invite
+##
 buyInvitePrice: 5000
 
+##
+## Periodically give players invites
+##
+auto:
+  all:
+    ## Interval (in minutes, 10080 = 1 week)
+    #interval: 10080
+    ## Don't automatically give any invites to players that
+    ## has x invites already.
+    #max: 5
+    ## Give all players 2 invites once (normally the first time
+    ## they join the server)
+    #once: 0
+  vip:
+    ## Example:
+    ## Give all players with permission "invites.auto.vip" 2 new invites once a week
+    ## And one invite once the first time they join/get vip
+    ## Don't give any invites if they have 10 or more invites already
+    interval: 10080
+    interval_count: 2
+    max: 10
+    once: 1
+
+##
 ## Commands
-cmdBase: "invite"
-cmdUse: "use"
-cmdGive: "give"
-cmdShow: "show"
-cmdReload: "reload"
-cmdBuy: "buy"
-cmdHelp: "help"
-
-## Language settings
-stringUsage: "Usage:"
-stringPlayer: "player"
-stringAmount: "amount"
-stringHelpShow: "Show player invites"
-stringHelpShowYour: "Show your invites"
-stringHelpUse: "Use invite on player"
-stringHelpBuy: "Buy invites"
-stringHelpBuyCost: "One invite costs %s"
-stringHelpGive: "Gives a player invites"
-
-stringInvitesNone: "%s has no invites available"
-stringInvitesSelfNone: "You have no invites available"
-stringInvitesOne: "%s has one invite available"
-stringInvitesSelfOne: "You have one invite available"
-stringInvites: "%s has %d invites available"
-stringInvitesSelf: "You have %d invites available"
-stringInvitedBy: "%s was invited by %p"
-stringInvited: "%s has invited:"
-stringAnd: "and"
-stringInvitedNone: "%s hasn't invited anyone yet"
-stringInviteGiven: "You have been given %d additional invite(s)."
-stringInviteGivenUsage: "Invite new players with /invite <player>"
-stringGiveInvite: "%s has been given %d new invite(s)."
-stringInviteSuccess: "%s has been invited."
-stringNoInvites: "You have no invites available"
-stringInviteError: "Unable to invite %s"
-stringInviteExists: "%s has already been invited"
-stringPermissionError: "You don't have permission for that command"
-stringNoPlayer: "No player specified"
-stringPlayerNotFound: "Player %s was not found"
-stringBuyDisabled: "Buying invites is disabled"
-stringBuySuccess: "Bought %d invites for %s"
-stringBuyFailed: "You don't have enough money to buy %d invites, another %s is needed"
-stringBuyError: "Unable to withdraw money"
+## Uncomment the variables below to change name of the commands
+## Note that in order to change "base" you must create an alias
+## for that command to /invite
+##
+#cmdBase: "invite"
+#cmdUse: "use"
+#cmdGive: "give"
+#cmdShow: "show"
+#cmdReload: "reload"
+#cmdBuy: "buy"
+#cmdHelp: "help"

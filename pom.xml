@@ -6,7 +6,7 @@
 
     <groupId>se.bonan.playerinvites</groupId>
     <artifactId>PlayerInvites</artifactId>
-    <version>0.1</version>
+    <version>0.2</version>
 
     <build>
         <plugins>

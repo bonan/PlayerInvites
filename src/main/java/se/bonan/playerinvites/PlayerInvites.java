@@ -2,44 +2,210 @@ package se.bonan.playerinvites;
 
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.ChatColor;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
+import se.bonan.playerinvites.commands.*;
+import se.bonan.playerinvites.exception.PlayerNotFoundException;
+import se.bonan.playerinvites.object.DataFile;
+import se.bonan.playerinvites.object.PlayerData;
+import se.bonan.playerinvites.tasks.AutoGiveTask;
+import se.bonan.playerinvites.tasks.SaveTask;
 
-/**
- * Date: 2015-03-14
- * Time: 01:37
- */
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.CharBuffer;
+import java.util.*;
+
 public class PlayerInvites extends JavaPlugin {
 
-    Invites invites;
-    Economy economy = null;
+    /**
+     * Static config for access from Str
+     */
+    public static FileConfiguration config;
+
+    /**
+     * Static cmd for access from Str
+     */
+    public static String cmd = "invite";
+
+    /**
+     * DataFile container, contains all relevant data for this plugin
+     */
+    private DataFile data;
+
+    /**
+     * For integration with Vault
+     */
+    private Economy economy = null;
+
+    /**
+     * Tasks
+     */
+    private BukkitTask saveTask;
+    private BukkitTask autoGiveTask;
+
+    /**
+     * Available command instances, resets on reload
+     */
+    private List<CommandInterface> commands = new ArrayList<>();
 
     @Override
     public void onEnable() {
-        if (!getDataFolder().exists())
+        File conf = new File(getDataFolder(), "config.yml");
+        if (!conf.exists()) {
             saveDefaultConfig();
-        setupEconomy();
-        invites = new Invites(this);
+            /**
+             * Generate new configuration file
+             */
+            try {
+                StringBuilder confString = new StringBuilder();
+
+                /**
+                 * Read old config
+                 */
+                FileReader r = new FileReader(conf);
+                char[] t = new char[1024];
+                for (int read = r.read(t); read >= 0; read = r.read(t)) {
+                    confString.append(String.valueOf(t).substring(0, read));
+                }
+                r.close();
+
+                /**
+                 * Add string configuration
+                 */
+                confString.append(Str.getConfig());
+
+                /**
+                 * Write configuration
+                 */
+                FileWriter w = new FileWriter(conf);
+                w.write(confString.toString());
+                w.close();
+            } catch (IOException e) {
+
+            }
+
+        }
+        data = new DataFile(null);
+        load();
+    }
+
+    @Override
+    public void onDisable() {
 
     }
 
     /**
-     * Gets Economy provider (Vault)
-     * @return True if economy is available
+     * Reloads configuration and data
+     * @return Empty string on success, error string otherwise
      */
-    private boolean setupEconomy() {
-        if (getServer().getPluginManager().getPlugin("Vault") == null) {
-            return false;
+    public String reload() {
+        reloadConfig();
+        return load();
+    }
+
+    /**
+     * Loads data from file and sets everything up
+     * @return Empty string on success, error string otherwise
+     */
+    public String load() {
+        try {
+            /**
+             * Static config used by Str
+             */
+            config = getConfig();
+
+            /**
+             * Name of base command, used by Str and in other places
+             */
+            cmd = config.getString("cmdBase", "invite");
+
+            /**
+             * Reset economy variable
+             */
+            economy = null;
+
+            /**
+             * Check for previously scheduled AutoGiveTask
+             */
+            if (autoGiveTask != null) {
+                /**
+                 * Cancel previous scheduled task
+                 */
+                autoGiveTask.cancel();
+                autoGiveTask = null;
+            }
+
+            /**
+             * Create new AutoGiveTask, loads settings from configuration
+             */
+            AutoGiveTask task = new AutoGiveTask(this);
+
+            /**
+             * Check if task is actually needed, otherwise scheduling is not
+             * necessary.
+             */
+            if (task.isNeeded()) {
+                /**
+                 * Schedule task
+                 */
+                autoGiveTask = task.runTaskTimer(this, 20, task.getInterval());
+            }
+
+            /**
+             * Define commands
+             *
+             * Command names can be overriden in config
+             */
+            this.commands = new LinkedList<>();
+            this.commands.add(new ShowCommand(config.getString("cmdShow", "show"), this));
+            this.commands.add(new UseCommand(config.getString("cmdUse", "use"), this));
+            this.commands.add(new BuyCommand(config.getString("cmdBuy", "buy"), this));
+            this.commands.add(new GiveCommand(config.getString("cmdGive", "give"), this));
+            this.commands.add(new ReloadCommand(config.getString("cmdReload", "reload"), this));
+
+            /**
+             * Loads file from data.json in plugin data folder
+             */
+            data = DataFile.load(new File(getDataFolder(), "data.json"), getServer());
+        } catch (Exception e) {
+            getLogger().warning("Unable to load PlayerInvites data file: " + e.getMessage());
+            return ChatColor.RED + "Reload error: " + e.getMessage();
         }
-        RegisteredServiceProvider<Economy> rsp = getServer().getServicesManager().getRegistration(Economy.class);
-        if (rsp == null) {
-            return false;
+        return "";
+    }
+
+    /**
+     * Schedule saving of data
+     */
+    public void save() {
+        save(false);
+    }
+
+    /**
+     * Schedules saving of data as json to data.json in plugin data folder
+     * If nothing has changed for 30 seconds, the file will be saved
+     * @param now True to save file directly (not async)
+     */
+    public void save(Boolean now) {
+        if (saveTask != null) {
+            saveTask.cancel();
         }
-        economy = rsp.getProvider();
-        return economy != null;
+        SaveTask task = new SaveTask(this, new File(getDataFolder(), "data.json"));
+        if (now) {
+            task.run();
+            saveTask = null;
+        } else {
+            saveTask = task.runTaskLaterAsynchronously(this, 20L*30L);
+        }
     }
 
     /**
@@ -48,377 +214,162 @@ public class PlayerInvites extends JavaPlugin {
      * @return Economy (null if not present)
      */
     public Economy getEconomy() {
+        if (economy == null) {
+            if (getServer().getPluginManager().getPlugin("Vault") != null) {
+                RegisteredServiceProvider<Economy> rsp = getServer().getServicesManager().getRegistration(Economy.class);
+                if (rsp != null) {
+                    economy = rsp.getProvider();
+                }
+            }
+        }
         return economy;
     }
 
+    /**
+     * Returns DataFile object
+     * @return Data file
+     */
+    public DataFile getData() {
+        return data;
+    }
+
+    /**
+     * Creates a new PlayerData object if not present and saves it to DataFile
+     * @param player Player object
+     * @param invitedBy Object of player who invited
+     * @return Player Data
+     */
+    public PlayerData addPlayer(OfflinePlayer player, OfflinePlayer invitedBy) {
+        PlayerData d;
+        Map<String,PlayerData> players = data.getPlayers();
+        String uuid = player.getUniqueId().toString();
+        if (players.containsKey(uuid)) {
+            d = players.get(uuid);
+        } else {
+            d = new PlayerData(player, invitedBy);
+            data.getPlayers().put(player.getUniqueId().toString(), d);
+        }
+        return d;
+    }
+
+    /**
+     * Gets PlayerData from a player object
+     * @param player
+     * @return Player Data
+     */
+    public PlayerData getPlayerData(OfflinePlayer player) {
+        return addPlayer(player, null);
+    }
+
+    /**
+     * Gets PlayerData from a player uuid
+     * @param uuid
+     * @return Player Data
+     * @throws PlayerNotFoundException
+     */
+    public PlayerData getPlayerData(String uuid) throws PlayerNotFoundException {
+        if (!data.getPlayers().containsKey(uuid))
+            throw new PlayerNotFoundException(uuid);
+        return data.getPlayers().get(uuid);
+    }
+
+    /**
+     * Invoked when console/player issues /invite
+     * @param sender
+     * @param command
+     * @param label
+     * @param args
+     * @return
+     */
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-
-        /**
-         * Strings for help text
-         */
-        String strUsage = getConfig().getString("stringUsage", "Usage:");
-        String strPlayer = getConfig().getString("stringPlayer", "player");
-        String strAmount = getConfig().getString("stringAmount", "amount");
-
-        /**
-         * Base command. Note that this only is used in help texts, you
-         * need to manually add an alias if you change the command
-         */
-        String cmdBase = getConfig().getString("cmdBase", "invite");
-
-        /**
-         * Sub-commands for /invite
-         */
-        String cmdUse = getConfig().getString("cmdUse", "use");
-        String cmdGive = getConfig().getString("cmdGive", "give");
-        String cmdShow = getConfig().getString("cmdShow", "show");
-        String cmdReload = getConfig().getString("cmdReload", "reload");
-        String cmdBuy = getConfig().getString("cmdBuy", "buy");
-        String cmdHelp = getConfig().getString("cmdHelp", "help");
 
         Player player = null;
         if (sender instanceof Player) {
             player = (Player) sender;
             if (!player.hasPermission(command.getPermission())) {
-                sender.sendMessage(ChatColor.RED + getConfig().getString(
-                        "stringPermissionError",
-                        "You don't have permission for that command"
-                ));
+                sender.sendMessage(Str.ErrorPermission.str());
                 return true;
             }
         }
 
         if (command.getName().equalsIgnoreCase("invite")) {
-            String cmd = "";
-            String arg1 = "";
-            String arg2 = "";
+
             if (args.length > 0) {
-                cmd = args[0];
-                if (args.length > 1)
-                    arg1 = args[1];
-                if (args.length > 2)
-                    arg2 = args[2];
-            }
-
-            /**
-             * Shows your or another players current number of invites, who invited them
-             *   and who they have invited
-             */
-            if (cmd.equalsIgnoreCase(cmdShow)) {
-                if (sender.hasPermission("invites.show") || sender.hasPermission("invites.showother")) {
-                    if (sender.hasPermission("invites.showother") && !arg1.equals("") && arg2.equals("")) {
+                /**
+                 * Look for command
+                 */
+                for (CommandInterface action: commands) {
+                    if (action.getName().equalsIgnoreCase(args[0])) {
                         /**
-                         * Show other players details
+                         * Check permission for command
                          */
-                        String invited = invites.showInvited(arg1);
-                        if (invited != null)
-                            sender.sendMessage(invited);
-                        sender.sendMessage(invites.showInvites(
-                                arg1,
-                                player != null && arg1.equalsIgnoreCase(player.getName())
-                        ));
-                        return true;
-                    } else if (arg1.equals("") && player != null) {
-                        /**
-                         * Show own details
-                         */
-                        String invited = invites.showInvited(player.getName());
-                        if (invited != null)
-                        sender.sendMessage(invited);
-                        sender.sendMessage(invites.showInvites(
-                                player.getName(),
-                                true
-                        ));
-                        return true;
-                    }
-                    if (player == null)
-                        /** Help text for console: "Usage: /invite show <player>" **/
-                        sender.sendMessage(strUsage+" /"+cmdBase+" "+cmdShow+" <"+strPlayer+">");
-                    else if (sender.hasPermission("invites.showother"))
-                        /** Help text for showother: "Usage: /invite show [player]" **/
-                        sender.sendMessage(strUsage+" /"+cmdBase+" "+cmdShow+" ["+strPlayer+"]");
-                    else
-                        /** Help text for show: "Usage: /invite show" **/
-                        sender.sendMessage(strUsage+" /"+cmdBase+" "+cmdShow);
-
-                    return true;
-                } else {
-                    sender.sendMessage(ChatColor.RED.toString() + getConfig().getString(
-                            "stringPermissionError",
-                            "You don't have permission for that command"
-                    ));
-                    return true;
-                }
-            }
-
-            /**
-             * Uses an invite to white list another player
-             */
-            if (cmd.equalsIgnoreCase(cmdUse)) {
-                if (sender.hasPermission("invites.invite") && player != null) {
-                    if (arg1.equals("") || !arg2.equals("")) {
-                        /** Help text for use: "Usage: /invite use <player>" **/
-                        sender.sendMessage(strUsage+" /"+cmdBase+" "+cmdUse+" <"+strPlayer+">");
-                        return true;
-                    }
-                    /**
-                     * Invites the player and sends result as a message
-                     */
-                    sender.sendMessage(invites.invitePlayer(player, arg1));
-                    return true;
-                } else {
-                    sender.sendMessage(ChatColor.RED.toString() + getConfig().getString(
-                            "stringPermissionError",
-                            "You don't have permission for that command"
-                    ));
-                    return true;
-                }
-            }
-
-            /**
-             * Buy invites for in-game money
-             *
-             * Uses Vault for Economy integration
-             */
-            if (cmd.equalsIgnoreCase(cmdBuy)) {
-                if (sender.hasPermission("invites.buy") && player != null) {
-                    /**
-                     * Check if economy is available and enabled
-                     */
-                    if (economy != null && getConfig().getBoolean("buyInvite", false)) {
-                        Integer count = 1;
-                        if (!arg1.equals("")) {
-                            try {
-                                count = Integer.parseInt(arg1);
-                            } catch (NumberFormatException e) {
-                                /** Message on invalid amount **/
-                                sender.sendMessage(strUsage+" /"+cmdBase+" "+cmdBuy+" ["+strAmount+"]");
-                                return true;
-                            }
-                        }
-
-                        if (count > 0 && arg2.equals("")) {
-                            /**
-                             * Buys invite and sends result as a message
-                             */
-                            sender.sendMessage(invites.buyInvite(player, count));
+                        if (!action.hasPerm(player)) {
+                            sender.sendMessage(Str.ErrorPermission.str());
                             return true;
                         }
 
-                        /** Message on too many/few arguments */
-                        sender.sendMessage(strUsage+" /"+cmdBase+" "+cmdBuy+" ["+strAmount+"]");
-                        return true;
-                    }
-                    sender.sendMessage(ChatColor.RED.toString() +
-                            getConfig().getString("stringBuyDisabled", "Buying invites is disabled"));
-                    return true;
-                } else {
-                    sender.sendMessage(ChatColor.RED.toString() + getConfig().getString(
-                            "stringPermissionError",
-                            "You don't have permission for that command"
-                    ));
-                    return true;
-                }
-            }
-
-            /**
-             * Reloads data file and configuration
-             */
-            if (cmd.equalsIgnoreCase(cmdReload)) {
-                if (sender.hasPermission("invites.reload")) {
-                    /**
-                     * Reloads the data file without saving
-                     *
-                     * Saving is done after every action, saving here would
-                     * make it impossible to manually edit the data file
-                     */
-                    String reload = invites.reload();
-                    if (reload.equals("")) {
                         /**
-                         * Reloads the configuration
+                         * Invoke command and return result to CommandSender
                          */
-                        reloadConfig();
-                        sender.sendMessage(ChatColor.GREEN.toString() +
-                                "Invite configuration and data reloaded successfully.");
+                        sender.sendMessage(
+                                action.invoke(
+                                        player,
+                                        Arrays.copyOfRange(args, 1, args.length)
+                                )
+                        );
                         return true;
                     }
-                    /**
-                     * Error when reloading, send error to admin in-game
-                     */
-                    sender.sendMessage(reload);
-                    return true;
-                } else {
-                    sender.sendMessage(ChatColor.RED.toString() + getConfig().getString(
-                            "stringPermissionError",
-                            "You don't have permission for that command"
-                    ));
-                    return true;
                 }
             }
 
             /**
-             * Give invites to player
-             *
-             * Note that this is an admin command, it does not subtract from
-             * your invites to give to another player.
-             */
-            if (cmd.equalsIgnoreCase(cmdGive)) {
-                if (sender.hasPermission("invites.give")) {
-                    Integer count = 1;
-                    if (!arg2.equals("")) {
-                        try {
-                            count = Integer.parseInt(arg2);
-                        } catch (NumberFormatException e) {
-                            /**
-                             * Invalid amount message
-                             * "Usage: /invite give <player> [amount]"
-                             */
-                            sender.sendMessage(strUsage+" /"+cmdBase+" "+cmdGive+" <"+strPlayer+"> ["+strAmount+"]");
-                            return true;
-                        }
-                    }
-                    if (arg1.equals("") || args.length > 3 || count == 0) {
-                        /**
-                         * Too few/many arguments, or amount = 0
-                         */
-                        sender.sendMessage(strUsage+" /"+cmdBase+" "+cmdGive+" <"+strPlayer+"> ["+strAmount+"]");
-                        return true;
-                    }
-
-                    /**
-                     * Give invites to player
-                     */
-                    sender.sendMessage(invites.giveInvite(arg1, count));
-                    return true;
-                } else {
-                    sender.sendMessage(ChatColor.RED.toString() + getConfig().getString(
-                            "stringPermissionError",
-                            "You don't have permission for that command"
-                    ));
-                    return true;
-                }
-            }
-
-            /**
-             * No return yet, no command or invalid command given.
-             *
-             * Show help text for the commands available to the player
-             *
-             * opts = Sub-commands separated with pipeline
+             * If no command was found, show help
              */
 
             String opts = "";
-            String text = "";
-            String text2 = "";
+            String usage = "";
 
-            if (sender.hasPermission("invites.showother")) {
+            /**
+             * Loop through commands to get usage and help strings
+             */
+            for (CommandInterface action: commands) {
                 /**
-                 * Help text if player has permission to show other players info
+                 * Don't show commands that the player doesn't have permission for
                  */
-                opts = ChatColor.GOLD + cmdShow + ChatColor.RESET;
-                text = ChatColor.DARK_GRAY + "  /" + cmdBase +
-                        ChatColor.GOLD + " " + cmdShow +
-                        ChatColor.RESET + " [" +
-                        ChatColor.DARK_GREEN + strPlayer +
-                        ChatColor.RESET + "] - " +
-                        getConfig().getString("stringHelpShow", "Show player invites") + "\n";
-            } else if (sender.hasPermission("invites.show")) {
-                /**
-                 * Help text if player only has permission to show their own info
-                 */
-                opts = ChatColor.GOLD + cmdShow + ChatColor.RESET;
-                text = ChatColor.DARK_GRAY + "  /" + cmdBase +
-                        ChatColor.GOLD + " " + cmdShow +
-                        ChatColor.RESET + " - " +
-                        getConfig().getString("stringHelpShowYour", "Show your invites") + "\n";
-            }
-
-            if (sender.hasPermission("invites.invite")) {
-                /**
-                 * Help text if player has permission to use invites
-                 */
-                opts = opts + (opts.length()>0?"|":"") + ChatColor.GOLD + cmdUse + ChatColor.RESET;
-                text = text + ChatColor.DARK_GRAY + "  /" + cmdBase +
-                        ChatColor.GOLD + " " + cmdUse +
-                        ChatColor.RESET + " <" +
-                        ChatColor.DARK_GREEN + strPlayer +
-                        ChatColor.RESET + "> - " +
-                        getConfig().getString("stringHelpUse", "Use invite on player") + "\n";
-            }
-
-            if (sender.hasPermission("invites.buy") && economy != null && getConfig().getBoolean("buyInvite", false)) {
-                /**
-                 * Help text if player has permission to buy invites, and economy is available
-                 */
-                Double price = getConfig().getDouble("buyInvitePrice", 0);
-                if (price > 0) {
-                    opts = opts + (opts.length()>0?"|":"") + ChatColor.GOLD + cmdBuy + ChatColor.RESET;
-                    text = text + ChatColor.DARK_GRAY + "  /" + cmdBase +
-                            ChatColor.GOLD + " " + cmdBuy +
-                            ChatColor.RESET + " [" +
-                            ChatColor.DARK_GREEN + strAmount +
-                            ChatColor.RESET + "] - " +
-                            getConfig().getString("stringHelpBuy", "Buy invites") + "\n";
+                if (action.hasPerm(player)) {
                     /**
-                     * Shows price for invite below help texts
+                     * Add command to opts string
                      */
-                    text2 = "\n" + getConfig().getString("stringHelpBuyCost", "" +
-                            "One invite costs %s")
-                            .replace("%s", ChatColor.BLUE.toString() + price + " " +
-                            (price==1?economy.currencyNameSingular() : economy.currencyNamePlural()));
+                    opts = opts + (opts.length() > 0 ? Str.HelpCmdSep.str() : "") + action.getName();
+
+                    /**
+                     * Get usage help
+                     */
+                    usage = usage + action.usage(player) + "\n";
+
+                    /**
+                     * Check for additional help strings
+                     */
+                    String help = action.help(player);
+                    if (help != null && !help.equals("")) {
+                        usage = usage + "    " + help + "\n";
+                    }
                 }
             }
 
-            if (sender.hasPermission("invites.give")) {
-                /**
-                 * Help text if player has permission to give (create new) invites
-                 */
-                opts = opts + (opts.length()>0?"|":"") + ChatColor.GOLD + cmdGive + ChatColor.RESET;
-                text = text + ChatColor.DARK_GRAY + "  /" + cmdBase +
-                        ChatColor.GOLD + " " + cmdGive +
-                        ChatColor.RESET + " <" +
-                        ChatColor.DARK_GREEN + strPlayer +
-                        ChatColor.RESET + "> [" +
-                        ChatColor.DARK_GREEN + strAmount +
-                        ChatColor.RESET + "] - " +
-                        getConfig().getString("stringHelpGive", "Give a player invites") + "\n";
-            }
-
-            if (sender.hasPermission("invites.reload")) {
-                /**
-                 * Help text if player has permission to reload plugin configuration/data
-                 */
-                opts = opts + (opts.length()>0?"|":"") + ChatColor.GOLD + cmdReload + ChatColor.RESET;
-                text = text + ChatColor.DARK_GRAY + "  /" + cmdBase +
-                        ChatColor.GOLD + " " + cmdReload +
-                        ChatColor.RESET + " - " +
-                        getConfig().getString("stringHelpReload", "Reloads configuration") + "\n";
-            }
-
-            if (text.equals("")) {
-                /**
-                 * Player has no permission to do anything
-                 */
-                sender.sendMessage(ChatColor.RED.toString() + getConfig().getString(
-                        "stringPermissionError",
-                        "You don't have permission for that command"
-                ));
-                return true;
-            }
+            /**
+             * Shows short usage line
+             * "Usage: /invite <show|give|use|...>"
+             */
+            sender.sendMessage(Str.HelpUsage.format(opts));
 
             /**
-             * Shows summary of available commands
-             *
-             * "Usage: /invite <show|use|buy|give|reload>"
+             * Shows help
              */
-            sender.sendMessage(strUsage + ChatColor.DARK_GRAY + " /" + cmdBase + ChatColor.RESET + " <" + opts + ">");
-
-            /**
-             * Shows help text for each sub command
-             */
-            sender.sendMessage(text+text2);
+            sender.sendMessage(usage);
             return true;
+
         }
 
         return false;

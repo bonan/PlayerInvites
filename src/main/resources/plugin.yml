@@ -1,13 +1,12 @@
 name: PlayerInvites
 main: se.bonan.playerinvites.PlayerInvites
-version: 0.1
+version: 0.2
 author: bonaan
 commands:
   invite:
-    description: Handles invitations
-    usage: /invite
+    description: Handles invitations, see /invite help
+    usage: /invite help
     permission: invites.use
-
 permissions:
   invites.use:
     description: Can use /invite
@@ -33,3 +32,9 @@ permissions:
   invites.reload:
     description: Reload invites configuration and data files
     default: op
+  invites.auto:
+    description: Give player invites automatically
+    default: true
+  invites.auto.*:
+    description: See config.yml for explaination
+    default: false
