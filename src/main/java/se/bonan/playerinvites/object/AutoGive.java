@@ -5,7 +5,6 @@ import org.bukkit.entity.Player;
 import se.bonan.playerinvites.PlayerInvites;
 import se.bonan.playerinvites.Str;
 
-import java.time.Instant;
 import java.util.Date;
 
 /**
@@ -107,7 +106,8 @@ public class AutoGive {
          * Check when player was last online
          */
         if (last_online > 0) {
-            Date lastOnline = Date.from(Instant.ofEpochMilli(player.getLastPlayed()));
+            Date lastOnline = new Date();
+            lastOnline.setTime(player.getLastPlayed());
             Long onlineDiff = (now.getTime() - lastOnline.getTime()) / 1000L;
 
             if (onlineDiff/60L > last_online) {
@@ -130,8 +130,10 @@ public class AutoGive {
             /**
              * Base last given on first played date if invite never has been given
              */
-            if (last == null)
-                last = Date.from(Instant.ofEpochMilli(player.getFirstPlayed()));
+            if (last == null) {
+                last = new Date();
+                last.setTime(player.getFirstPlayed());
+            }
 
             /**
              * Seconds since last given invite
