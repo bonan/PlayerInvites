@@ -50,6 +50,8 @@ public enum Str {
     HelpBuyCost("One invite costs %1"), // %1 = Amount + Currency
     HelpSet("Set number of invites for a player"),
     HelpGive("Give a player invites"),
+    HelpStats("Show statistics"),
+    HelpTop("Show toplists"),
     ShowInvitesNone("§b%1§a has §bno§a invites available"), // %1 = Player name
     ShowInvitesOne("§b%1§a has §bone§a invite available"), // %1 = Player name, %2 = count
     ShowInvites("§b%1§a has §b%2§a invites available"),
@@ -70,7 +72,13 @@ public enum Str {
     InviteSuccess("§b%1§a has been invited."),
     BuySuccess("§aBought §b%1§a invites for §b%2"),
     ReloadSuccess("§aConfiguration and data reloaded successfully"),
+    StatsInvited("§aA total of §b%1§a players have been invited."),
+    StatsInvites("§aThere are currently §b%1§a players having §b%1§a unused invites"),
+    TopInvited("§aTop invited players: %1"),
+    TopInvites("§aTop unused invites: %1"),
+    TopPlayer("§b%1 §7(%2)§a"),
 
+    ErrorNoData("§cNo data available yet"),
     ErrorPermission("§cYou don't have permission to use that command"),
     ErrorConsole("§cThis command cannot be run from console"),
     ErrorNoInvites("§cYou have no invites available"),

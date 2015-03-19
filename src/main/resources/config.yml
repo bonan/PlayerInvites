@@ -11,6 +11,12 @@ buyInvite: false
 buyInvitePrice: 5000
 
 ##
+## Number of players to show in toplists
+##
+topInvites: 5
+topInvited: 5
+
+##
 ## Periodically give players invites
 ##
 auto:
@@ -46,3 +52,5 @@ auto:
 #cmdReload: "reload"
 #cmdBuy: "buy"
 #cmdHelp: "help"
+#cmdStats: "stats"
+#cmdTop: "top"

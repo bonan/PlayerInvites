@@ -168,7 +168,11 @@ public class PlayerInvites extends JavaPlugin {
             this.commands = new LinkedList<>();
             this.commands.add(new ShowCommand(config.getString("cmdShow", "show"), this));
             this.commands.add(new UseCommand(config.getString("cmdUse", "use"), this));
-            this.commands.add(new BuyCommand(config.getString("cmdBuy", "buy"), this));
+            if (config.getBoolean("buyInvite", false)) {
+                this.commands.add(new BuyCommand(config.getString("cmdBuy", "buy"), this));
+            }
+            this.commands.add(new StatsCommand(config.getString("cmdStats", "stats"), this));
+            this.commands.add(new TopCommand(config.getString("cmdTop", "top"), this));
             this.commands.add(new GiveCommand(config.getString("cmdGive", "give"), this));
             this.commands.add(new ReloadCommand(config.getString("cmdReload", "reload"), this));
 

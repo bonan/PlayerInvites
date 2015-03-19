@@ -29,6 +29,12 @@ permissions:
   invites.showgiven:
     description: Displays a message to a user when they're given invites
     default: true
+  invites.stats:
+    description: Show stats for invites
+    default: true
+  invites.toplist:
+    description: Show toplist of most invited
+    default: true
   invites.reload:
     description: Reload invites configuration and data files
     default: op
