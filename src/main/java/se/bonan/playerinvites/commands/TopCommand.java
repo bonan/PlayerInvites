@@ -81,8 +81,8 @@ public class TopCommand extends CommandBase implements CommandInterface {
     private class CompareInt implements Comparator<Object> {
         @Override
         public int compare(Object o1, Object o2) {
-            return ((Map.Entry<String,Integer>) o1).getValue().compareTo(
-                    ((Map.Entry<String,Integer>) o2).getValue());
+            return ((Map.Entry<String,Integer>) o2).getValue().compareTo(
+                    ((Map.Entry<String,Integer>) o1).getValue());
         }
     }
 
