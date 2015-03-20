@@ -73,7 +73,7 @@ public enum Str {
     BuySuccess("§aBought §b%1§a invites for §b%2"),
     ReloadSuccess("§aConfiguration and data reloaded successfully"),
     StatsInvited("§aA total of §b%1§a players have been invited."),
-    StatsInvites("§aThere are currently §b%1§a players having §b%1§a unused invites"),
+    StatsInvites("§aThere are currently §b%1§a players having §b%2§a unused invites"),
     TopInvited("§aTop invited players: %1"),
     TopInvites("§aTop unused invites: %1"),
     TopPlayer("§b%1 §7(%2)§a"),
